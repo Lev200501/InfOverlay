@@ -3,7 +3,7 @@ util.require_natives("1640181023")
 
 --client resolution/aspect ratio
 local res_x, res_y = directx.get_client_size()
-local ASPECT_RATIO <const> = res_x/res_y
+local ASPECT_RATIO <const> = 16/9 -- res_x/res_y
 
 --set position
 local gui_x = 0
