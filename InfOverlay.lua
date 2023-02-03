@@ -61,6 +61,7 @@ local colour =
     background = {r = 0, g = 0, b = 0, a = 77/255},
     health_bar = {r = 114/255, g = 204/255, b = 114/255, a = 150/255},
     armour_bar = {r = 70/255, g = 136/255, b = 171/255, a = 150/255},
+    map = {r = 1, g = 1, b = 1, a = 0.75},
     blip = {r = 1, g = 1, b = 1, a = 1},
     name = {r = 1, g = 1, b = 1, a = 1},
     label = {r = 1, g = 1, b = 1, a = 1},
@@ -137,6 +138,9 @@ menu.colour(colours, "Health Bar Colour", {"overlayhealth_bar"}, "Colour of the 
 end)
 menu.colour(colours, "Armour Bar Colour", {"overlayarmour_bar"}, "Colour of the armour bar.", colour.armour_bar, true, function(on_change)
     colour.armour_bar = on_change
+end)
+menu.colour(colours, "Map Colour", {"overlaymap"}, "Colour of the map.", colour.map, true, function(on_change)
+    colour.map = on_change
 end)
 menu.colour(colours, "Blip Colour", {"overlayblip"}, "Colour of the map blip.", colour.blip, true, function(on_change)
     colour.blip = on_change
@@ -432,7 +436,7 @@ while true do
             drawRect(map_x, player_list_y, map_w_total, gui_h, colour.background)
 
             --map
-            directx.draw_texture(textures.map, map_w/2, gui_h, 0.5, 0.5, map_x + padding_x * 2 + bar_w + map_w/2 , player_list_y + gui_h/2, 0, 1, 1, 1, 0.75)
+            directx.draw_texture(textures.map, map_w/2, gui_h, 0.5, 0.5, map_x + padding_x * 2 + bar_w + map_w/2 , player_list_y + gui_h/2, 0, colour.map)
 
             --blip
             directx.draw_texture(textures.blip, 0.004, 0.004, 0.5, 0.5, map_x + padding_x * 2 + bar_w + ((player_pos.x + 4000)/8500) * map_w, player_list_y + (1 - (player_pos.y + 4000)/12000) * gui_h, (360 - heading)/360, colour.blip)
