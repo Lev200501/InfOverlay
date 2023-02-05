@@ -1,7 +1,7 @@
 -- InfOverlay
 -- by lev
 
-local SCRIPT_VERSION = "0.10"
+local SCRIPT_VERSION = "1.1"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, auto_updater = pcall(require, "auto-updater")
