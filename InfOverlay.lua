@@ -1,7 +1,7 @@
 -- InfOverlay
 -- by lev
 
-local SCRIPT_VERSION = "1.1"
+local SCRIPT_VERSION = "1.2"
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, auto_updater = pcall(require, "auto-updater")
@@ -46,6 +46,11 @@ auto_updater.run_auto_update(auto_update_config)
 --natives
 util.require_natives(1640181023)
 
+--global
+local GlobalplayerBD = 2657971
+local gta_version = "1.69"
+local need_update = NETWORK._GET_ONLINE_VERSION() ~= gta_version
+
 --client resolution/aspect ratio
 local RES_X, RES_Y = 1920, 1080
 local ASPECT_RATIO <const> = RES_X/RES_Y
@@ -63,6 +68,7 @@ local colour =
     armour_bar = {r = 70/255, g = 136/255, b = 171/255, a = 150/255},
     map = {r = 1, g = 1, b = 1, a = 0.75},
     blip = {r = 1, g = 1, b = 1, a = 1},
+    myblip = {r = 1, g = 0, b = 0, a = 1},
     name = {r = 1, g = 1, b = 1, a = 1},
     label = {r = 1, g = 1, b = 1, a = 1},
     info = {r = 1, g = 1, b = 1, a = 1},
@@ -76,6 +82,7 @@ local spacing = 3/RES_Y
 local gui_w = 290/RES_X
 local bar_w_mult = 1.8
 local blip_size = 0.0035
+local my_blip_size = 0.0028
 
 --settings text sizing & spacing
 local name_size = 0.52
@@ -147,6 +154,9 @@ end)
 menu.colour(colours, "Blip Colour", {"overlayblip"}, "Colour of the map blip.", colour.blip, true, function(on_change)
     colour.blip = on_change
 end)
+menu.colour(colours, "Your Blip Colour", {"overlaymyblip"}, "Colour of the your map blip.", colour.myblip, true, function(on_change)
+    colour.myblip = on_change
+end)
 
 menu.divider(colours, "Text")
 menu.colour(colours, "Name Colour", {"overlayname"}, "Colour of the player name text.", colour.name, true, function(on_change)
@@ -181,6 +191,9 @@ menu.slider_float(element_dim, "Bar Width Multiplier", {}, "Multiplier for the w
 end)
 menu.slider_float(element_dim, "Blip Size", {}, "Size of the map blip.", 0, math.floor(3 * blip_size * 10000), math.floor(blip_size * 10000), 1, function(on_change)
     blip_size = on_change/10000
+end)
+menu.slider_float(element_dim, "Your Blip Size", {}, "Size of the your map blip.", 0, math.floor(3 * my_blip_size * 10000), math.floor(my_blip_size * 10000), 1, function(on_change)
+    my_blip_size = on_change/10000
 end)
 
 --set text sizing & spacing
@@ -282,7 +295,16 @@ while true do
             local pid = focused[1]
             if render_window then pid = players.user() end
             local ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
-            local my_pos, player_pos = players.get_position(players.user()), players.get_position(pid)
+            local my_ped = players.user_ped()
+            local my_pos = players.get_position(players.user())
+            local player_pos
+            if not need_update and memory.read_byte(memory.script_global(GlobalplayerBD + 1 + (pid * 465) + 74 + 11)) == 1 then
+                player_pos = v3.new(memory.script_global(GlobalplayerBD + 1 + (pid * 465) + 74 + 12))
+            elseif not need_update and memory.read_int(memory.script_global(GlobalplayerBD + 1 + (pid * 465) + 74 + 6)) ~= -1 then
+                player_pos = v3.new(memory.script_global(GlobalplayerBD + 1 + (pid * 465) + 74 + 7))
+            else
+                player_pos = players.get_position(pid)
+            end
             
             --general element drawing locals
             local spacing_x = spacing/ASPECT_RATIO
@@ -295,6 +317,7 @@ while true do
             -------------
 
             local heading = ENTITY.GET_ENTITY_HEADING(ped)
+            local my_heading = ENTITY.GET_ENTITY_HEADING(my_ped)
 
             local regions = 
             {
@@ -312,7 +335,7 @@ while true do
                     width = total_w/2,
                     content =
                     {
-                        {"Language", ({"English","French","German","Italian","Spanish","Brazilian","Polish","Russian","Korean","Chinese (T)","Japanese","Mexican","Chinese (S)"})[players.get_language(pid) + 1]},
+                        {"Language", ({"English","French","German","Italian","Spanish","Brazilian","Polish","Russian","Korean","Chinese (T)","Japanese","Mexican","Chinese (S)","N/A"})[players.get_language(pid) + 1]},
                         {"Controller", boolText(players.is_using_controller(pid))},
                         {"Ping", math.floor(NETWORK._NETWORK_GET_AVERAGE_LATENCY_FOR_PLAYER(pid) + 0.5).." ms"},
                         {"Host Queue", "#"..players.get_host_queue_position(pid)},
@@ -452,22 +475,32 @@ while true do
             local blip_dy = (1 - (player_pos.y + 4427)/12689) * gui_h
             directx.draw_texture(textures.blip, blip_size, blip_size, 0.5, 0.5, map_x + padding_x * 2 + bar_w + blip_dx, player_list_y + blip_dy, (360 - heading)/360, colour.blip)
 
+            --my blip
+            local blip_dx = ((my_pos.x + 3745)/8316) * map_w
+            local blip_dy = (1 - (my_pos.y + 4427)/12689) * gui_h
+            directx.draw_texture(textures.blip, my_blip_size, my_blip_size, 0.5, 0.5, map_x + padding_x * 2 + bar_w + blip_dx, player_list_y + blip_dy, (360 - my_heading)/360, colour.myblip)
+
             -------------------------
             -- HEALTH & ARMOUR BAR --
             -------------------------
 
             --armour bar
-            local armour_perc = PED.GET_PED_ARMOUR(ped)/PLAYER.GET_PLAYER_MAX_ARMOUR(pid)
+            local armour_cur = PED.GET_PED_ARMOUR(ped)
+            local armour_max = PLAYER.GET_PLAYER_MAX_ARMOUR(pid)
+            if armour_cur > armour_max then armour_cur = armour_max end
+            local armour_perc = armour_cur/armour_max
             local armour_bar_bg = {r = colour.armour_bar.r/2, g = colour.armour_bar.g/2, b = colour.armour_bar.b/2, a = colour.armour_bar.a}
 
             drawRect(map_x + padding_x, player_list_y + gui_h/2 - padding/2, bar_w, -((gui_h - padding * 3)/2 * armour_perc), colour.armour_bar) --foreground
             drawRect(map_x + padding_x, player_list_y + padding, bar_w, (gui_h - padding * 3)/2 * (1 - armour_perc), armour_bar_bg) --background
 
             --health bar
-            local health_min = ENTITY.GET_ENTITY_HEALTH(ped) - 100
-            if health_min < 0 then health_min = 0 end
+            local health_cur = ENTITY.GET_ENTITY_HEALTH(ped) - 100
+            local health_max = ENTITY.GET_ENTITY_MAX_HEALTH(ped) - 100
+            if health_cur < 0 then health_cur = 0 end
+            if health_cur > health_max then health_cur = health_max end
 
-            local health_perc = health_min/(ENTITY.GET_ENTITY_MAX_HEALTH(ped) - 100)
+            local health_perc = health_cur/health_max
             local health_bar_bg = {r = colour.health_bar.r/2, g = colour.health_bar.g/2, b = colour.health_bar.b/2, a = colour.health_bar.a}
 
             drawRect(map_x + padding_x, player_list_y + gui_h - padding, bar_w, -((gui_h - padding * 3)/2 * health_perc), colour.health_bar) --foreground
